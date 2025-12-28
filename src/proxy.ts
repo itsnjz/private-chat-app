@@ -18,15 +18,30 @@ export const proxy = async (req: NextRequest) => {
         return NextResponse.redirect(new URL("/?error=room-not-found", req.url))
     }
 
+    const exisitingToken = req.cookies.get("x-auth-token")?.value
+
+    if(exisitingToken && meta.connected.includes(exisitingToken)){
+        return NextResponse.next()
+    }
+
+    if(meta.connected.length >=2 ){
+        return NextResponse.redirect(new URL("/? error=room-full ", req.url))
+    }
+
     const response = NextResponse.next()
 
     const token = nanoid()
+
     response.cookies.set("x-auth-token", token, 
     {
         path: "/",
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
+    })
+
+    await redis.hset(`meta:${roomId}`, {
+        connected: [...meta.connected, token],
     })
 
     return response
